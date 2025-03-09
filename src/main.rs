@@ -3,15 +3,20 @@ use axum::{
     Json,
     Router,
 };
-use models::block::IBlock;
-use std::time::UNIX_EPOCH;
-use std::time::SystemTime;
-use models::block::Block;
+use models::block::{
+    get_genesis_block,
+    is_valid_chain,
+    IBlock,
+    Block
+};
 mod models;
 
+static mut BLOCKCHAIN: Vec::<Block> = Vec::<Block>::new();
 
 #[tokio::main]
 async fn main() {
+
+    initialize_blockchain();
     let app = Router::new()
         .route("/", get(handler));
 
@@ -21,21 +26,33 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn handler() -> Json<[Block; 2]> {
-    let start = SystemTime::now();
-    let since_the_epoch = start
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
+fn initialize_blockchain() {
+    unsafe { BLOCKCHAIN.push(get_genesis_block()) };
+}
 
-    let genesis_block = Block {
-        index: 0,
-        hash: String::from("816534932c2b7154836da6afc367695e6337db8a921823784c14378abed4f7d7"),
-        previous_hash: None,
-        timestamp: since_the_epoch.as_secs(),
-        data: String::from("my genesis block!!")
-    };
+async fn handler() -> Json<Vec::<Block>> {
+    unsafe {
+        let last_block =  BLOCKCHAIN [BLOCKCHAIN.len() - 1].clone();
 
-    let second_block = genesis_block.next_block(&String::from("my second block"));
+        let new_block = last_block.next_block(&String::from("new block"));
 
-    Json([genesis_block, second_block])
+        BLOCKCHAIN.push(new_block);
+
+        if is_valid_chain(&BLOCKCHAIN.clone()) {
+            return Json(BLOCKCHAIN.clone());
+        }
+
+        BLOCKCHAIN.pop();
+
+        return Json(BLOCKCHAIN.clone())
+    }
+}
+
+
+
+pub unsafe fn replace_chain(new_blocks: &Vec<Block>) {
+    if is_valid_chain(new_blocks) && new_blocks.len() > BLOCKCHAIN.len() {
+        BLOCKCHAIN = new_blocks.clone();
+        // broadcast_latest_chain()
+    }
 }
