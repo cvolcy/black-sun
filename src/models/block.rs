@@ -5,8 +5,7 @@ pub trait IBlock {
     fn next_block(&self, block_data: &String) -> Block;
 }
 
-#[derive(Clone)]
-#[derive(PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[derive(serde::Serialize)]
 pub struct Block {
     pub index: u64,
