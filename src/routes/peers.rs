@@ -8,6 +8,7 @@ use axum::{
         connect_info::ConnectInfo
     }, response::IntoResponse, routing::any, Json, Router
 };
+use serde_json::json;
 use axum_extra::TypedHeader;
 use std::ops::ControlFlow;
 use futures::{sink::SinkExt, stream::StreamExt};
@@ -16,19 +17,19 @@ use crate::AppState;
 
 pub fn peers_router(state: Arc<Mutex<AppState>>) -> Router<Arc<Mutex<AppState>>> {
     Router::new()
-        .route("/", any(handle_root))
+        .route("/", any(handle_get_peer_list))
         .route("/ws", any(handle_ws_upgrade))
         .with_state(state)
 }
 
-async fn handle_root() -> impl IntoResponse {
-    println!("Peers root");
+async fn handle_get_peer_list(State(state): State<Arc<Mutex<AppState>>>) -> impl IntoResponse {
+    let peers = state.lock().unwrap().peers.lock().unwrap().clone();
 
-    Json(String::from("Ok"))
+    Json(json!(peers))
 }
 
 async fn handle_ws_upgrade(
-    State(_state): State<Arc<Mutex<AppState>>>,
+    State(state): State<Arc<Mutex<AppState>>>,
     ws: WebSocketUpgrade,
     user_agent: Option<TypedHeader<headers::UserAgent>>,
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
@@ -42,17 +43,19 @@ async fn handle_ws_upgrade(
 
     println!("`{user_agent}` at {addr} connected.");
 
-    // ()
-
-    return ws.on_upgrade(move |socket| handle_socket(socket, addr))
+    return ws.on_upgrade(move |socket| {
+        let peers: Arc<Mutex<Vec<SocketAddr>>> = state.lock().unwrap().peers.clone();
+        handle_socket(socket, addr, peers)
+    })
 }
 
-async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
+async fn handle_socket(mut socket: WebSocket, who: SocketAddr, peers: Arc<Mutex<Vec<SocketAddr>>>) {
     if socket
         .send(Message::Ping(Bytes::from_static(&[1, 2, 3])))
         .await
         .is_ok()
     {
+        peers.lock().unwrap().push(who);
         println!("Pinged {who}");
     } else {
         println!("Could not send ping to {who}");
@@ -138,6 +141,8 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr) {
         }
     }
 
+    let index = peers.lock().unwrap().iter().position(|x| *x == who).unwrap();
+    peers.lock().unwrap().remove(index);
     println!("Websocket context {who} destroyed");
 }
 

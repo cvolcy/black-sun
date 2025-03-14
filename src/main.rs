@@ -15,12 +15,14 @@ mod routes;
 #[derive(Clone, Debug)]
 pub struct AppState {
     blockchain: Arc<Mutex<Vec<Block>>>,
+    peers: Arc<Mutex<Vec<SocketAddr>>>
 }
 
 #[tokio::main]
 async fn main() {
     let state = AppState {
         blockchain: Arc::new(Mutex::new(Vec::<Block>::new().to_owned())),
+        peers: Arc::new(Mutex::new(Vec::<SocketAddr>::new()))
     };
 
     let shared_state = Arc::new(Mutex::new(state));

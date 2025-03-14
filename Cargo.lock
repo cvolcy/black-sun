@@ -165,6 +165,7 @@ dependencies = [
  "futures-util",
  "headers",
  "serde",
+ "serde_json",
  "sha256",
  "tokio",
  "tokio-tungstenite",
