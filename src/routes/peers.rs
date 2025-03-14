@@ -88,7 +88,10 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr, peers: Arc<Mutex<
     let (mut sender, mut receiver) = socket.split();
     let mut send_task = tokio::spawn(async move {
         let n_msg = 20;
-        for i in 0..n_msg {
+        // for i in 0..n_msg {
+        let mut i = 0;
+        loop {
+            i = i + 1;
             if sender
                 .send(Message::Text(format!("Server message {i} ...").into()))
                 .await
@@ -100,17 +103,17 @@ async fn handle_socket(mut socket: WebSocket, who: SocketAddr, peers: Arc<Mutex<
             tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         }
 
-        println!("Sending close to {who}...");
-        if let Err(e) = sender
-            .send(Message::Close(Some(CloseFrame {
-                code: close_code::NORMAL,
-                reason: Utf8Bytes::from_static("Goodbye"),
-            })))
-            .await
-        {
-            println!("Could not send Close due to {e}, probably it is ok?");
-        }
-        n_msg
+        // println!("Sending close to {who}...");
+        // if let Err(e) = sender
+        //     .send(Message::Close(Some(CloseFrame {
+        //         code: close_code::NORMAL,
+        //         reason: Utf8Bytes::from_static("Goodbye"),
+        //     })))
+        //     .await
+        // {
+        //     println!("Could not send Close due to {e}, probably it is ok?");
+        // }
+        // n_msg
     });
 
     let mut recv_task = tokio::spawn(async move {
