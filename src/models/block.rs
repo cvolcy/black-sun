@@ -1,6 +1,11 @@
 use sha256::digest;
 use std::time::{ UNIX_EPOCH, SystemTime };
 
+// in seconds
+pub const BLOCK_GENERATION_INTERVAL: u8 = 10;
+// in blocks
+pub const DIFFICULTY_ADJUSTMENT_INTERVAL: u8 = 10;
+
 pub trait IBlock {
     fn next_block(&self, block_data: &String) -> Block;
 }
@@ -13,6 +18,8 @@ pub struct Block {
     pub previous_hash: String,
     pub timestamp: u64,
     pub data: String,
+    pub difficulty: u8,
+    pub nonce: u64,
 }
 
 impl IBlock for Block {
@@ -26,7 +33,9 @@ impl IBlock for Block {
             hash: next_hash,
             previous_hash: self.hash.clone(),
             timestamp: next_timestamp,
-            data: block_data.clone()
+            data: block_data.clone(),
+            difficulty: 0,
+            nonce: 0,
         }
     }
 }
@@ -37,7 +46,9 @@ pub fn get_genesis_block() -> Block {
         hash: String::from("000000000000000000000000000000000000000000000000000000000000000"),
         previous_hash: String::from(""),
         timestamp: 1741545545,
-        data: String::from("my genesis block!!")
+        data: String::from("my genesis block!!"),
+        difficulty: 0,
+        nonce: 0,
     }
 }
 
@@ -82,4 +93,43 @@ pub fn is_valid_chain(blockchain: &Vec<Block>) -> bool {
     }
 
     return true;
+}
+
+pub fn hash_matches_difficulty(hash: String, difficulty: u8) -> bool {
+    let hash_in_binary: String = {
+        let mut binary_string = String::new();
+        for c in hash.chars() {
+            let digit = u8::from_str_radix(&c.to_string(), 16).unwrap();
+            binary_string.push_str(&format!("{:04b}", digit));
+        }
+        binary_string
+    };
+    let required_prefix = '0'.to_string().repeat(difficulty as usize);
+    return hash_in_binary.starts_with(&required_prefix);
+}
+
+pub fn get_difficulty(blockchain: Vec<Block>) -> u8 {
+    let latest_block = &blockchain[blockchain.len() - 1];
+
+    let difficulty = if latest_block.index % (DIFFICULTY_ADJUSTMENT_INTERVAL as u64) == 0 && latest_block.index != 0 {
+        get_adjusted_difficulty(latest_block, &blockchain)
+    } else {
+        latest_block.difficulty
+    };
+
+    difficulty
+}
+
+fn get_adjusted_difficulty(latest_block: &Block, blockchain: &Vec<Block>) -> u8 {
+    const TIME_EXPECTED: u8 = BLOCK_GENERATION_INTERVAL * DIFFICULTY_ADJUSTMENT_INTERVAL;
+    let prev_adjustment_block = &blockchain[blockchain.len() - DIFFICULTY_ADJUSTMENT_INTERVAL as usize];
+    let time_taken: u8 = (latest_block.timestamp - prev_adjustment_block.timestamp) as u8;
+    
+    if time_taken < TIME_EXPECTED / 2 {
+        return prev_adjustment_block.difficulty + 1;
+    } else if time_taken > TIME_EXPECTED * 2 {
+        return prev_adjustment_block.difficulty - 1;
+    } else {
+        return prev_adjustment_block.difficulty;
+    }
 }
