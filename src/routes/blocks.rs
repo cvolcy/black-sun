@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 use axum::{extract::State, response::IntoResponse, routing::{get, post}, Form, Json, Router};
 use serde::Deserialize;
-use crate::{models::block::{Block, IBlock}, AppState};
+use crate::{models::block::{generate_next_block, Block, IBlock}, AppState};
 
 #[derive(Deserialize)]
 struct MineBlockDataRequest {
@@ -31,12 +31,10 @@ async fn mine_block(
     Form(mbdr): Form<MineBlockDataRequest>
 ) -> impl IntoResponse {
     let state = state.lock().unwrap();
-    let mut blockchain = state.blockchain.lock().unwrap();
+    let blockchain: std::sync::MutexGuard<'_, Vec<Block>> = state.blockchain.lock().unwrap();
 
-    let last_block = blockchain[blockchain.len() - 1].clone();
-    let new_block = last_block.next_block(&mbdr.block_data);
+    let new_block = generate_next_block(blockchain, mbdr.block_data);
     let response = new_block.clone();
     
-    blockchain.push(new_block);
     Json(response)
 }

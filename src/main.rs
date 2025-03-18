@@ -54,18 +54,7 @@ fn initialize_blockchain(state: &Arc<Mutex<AppState>>) {
 
 async fn handler(State(state): State<Arc<Mutex<AppState>>>) -> Json<Vec::<Block>> {
     let state = state.lock().unwrap();
-    let mut blockchain = state.blockchain.lock().expect("blockchain was poisoned");
-    let last_block =  blockchain[blockchain.len() - 1].clone();
-
-    let new_block = last_block.next_block(&String::from("new block"));
-
-    blockchain.push(new_block);
-
-    if is_valid_chain(&blockchain.clone()) {
-        let mut response = blockchain.clone();
-        response.reverse();
-        return Json(response);
-    }
+    let blockchain = state.blockchain.lock().expect("blockchain was poisoned");
 
     let mut response = blockchain.clone();
     response.reverse();
